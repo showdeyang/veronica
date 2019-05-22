@@ -7,18 +7,18 @@ import re
 import jieba
 import random
 import matplotlib.pyplot as plt 
-
-with open('./baidu_zhidao.json','r') as f:
-    data = json.loads(f.read())
-
-rawData = []
-for qa in data:
-    q = qa['q']
-    if 'ans' in qa.keys():
-        if len(qa['ans']) > 0:
-            ans = [item['a'].replace('展开全部','') for item in qa['ans']]
-    rawData.append([q,ans])
-    
+#
+#with open('./baidu_zhidao.json','r') as f:
+#    data = json.loads(f.read())
+#
+#rawData = []
+#for qa in data:
+#    q = qa['q']
+#    if 'ans' in qa.keys():
+#        if len(qa['ans']) > 0:
+#            ans = [item['a'].replace('展开全部','') for item in qa['ans']]
+#    rawData.append([q,ans])
+#    
 def relevance(qc,ac):
     c = 0 
     for x in qc:
@@ -93,8 +93,8 @@ def prepareX(pair, ID):
     #this only prepares a row of X for a (q,a)-pair.
     q,a = pair[0], pair[1]
     qc,ac = list(jieba.cut(q)), list(jieba.cut(a))
-    row = [score(qc,ac), score2(qc,ac), ID]
-    #relevance(qc,ac), depth(qc,ac), relevance2(qc,ac), depth2(qc,ac), qInA(q,a), aInQ(q,a), len(qc), len(ac), 
+    row = [score(qc,ac), score2(qc,ac), relevance(qc,ac), depth(qc,ac), relevance2(qc,ac), depth2(qc,ac), qInA(q,a), aInQ(q,a), len(qc), len(ac),  ID]
+    #
     return row
 
 def goodPairs(rawData):
@@ -113,6 +113,19 @@ def badPairs(rawData,n=len(rawData)):
         q,a = data1[0],random.choice(data2[1])
         pair = [q,a]
         results.append(pair)
+        
+    for qa in rawData:
+        for i in range(len(qa[1])):
+            q = qa[0]
+            k = 4
+            v = random.choice(range(1,k))
+            a = qa[1][i]
+            for j in range(v):
+                if len(a) > 4:
+                    a = a.replace(random.choice(a),'')
+            pair = [q,a] 
+            results.append(pair)
+    
     return results
 
 def relu(z):
@@ -127,8 +140,8 @@ def mlp(x, y, h=[]):
     #example: h = [50,20,10] means this mlp has three hidden layers of node count 50, 20 and 10 respectively. Default: no hidden layer.
     def genLayer(a1,a2):
         #a1 = input array size, a2 = output array size
-        w = np.random.uniform(-10,10, size=(a1, a2))
-        b = np.random.uniform(-10,10,a2)
+        w = np.random.uniform(-10000,10000, size=(a1, a2))
+        b = np.random.uniform(-10000,10000,a2)
         return w,b
     params = []
     if len(h) == 0: 
@@ -181,8 +194,8 @@ def predict(q,a,params):
     y = y.flatten()
     return y
 
-def mutation(params, variation, rate=1, offsprings=10):
-    os = []
+def mutation(params, variation, rate=1, offsprings=100):
+    os = [params]
     for i in range(offsprings):
         rparams = []
         for param in params:
@@ -194,148 +207,310 @@ def mutation(params, variation, rate=1, offsprings=10):
         os.append(rparams)
     return os
 
-def training(xs, ys, teX, teY, n=50, decision=0.5):
-    params = mlp(2,1, h=[10])
-    minLoss = 1
+def training(xs, ys, teX, teY, n=100000, decision=0.5):
+    params = mlp(10,1, h=[20,20,20])
+    maxAcc = 0
     iteration = 0
     for j in range(n):
         iteration += 1
-        dev = math.sqrt(10*10)/(math.sqrt(j+1))
-        params_offsprings = mutation(params,dev)
-        offsprings = range(len(params_offsprings))
         print('training iteration',iteration)
-        losses = []
+        dev = math.sqrt(100*math.fabs(10000*maxAcc))/(math.sqrt((j+1)) )
+        #dev += np.random.lognormal(0,10*dev)
+        offsprings = int(10 + np.random.lognormal(100/(dev+1)))
+        if offsprings > 30:
+            offsprings = 30
+        print('acc',maxAcc)
+        print('dev', dev)
+        print('offsprings',offsprings)
+        params_offsprings = mutation(params,dev, offsprings=offsprings)
+        offsprings = range(len(params_offsprings))
+        
+        #losses = []
+        accuracies = []
         for i in offsprings:
             #i = 0,1,2,3,..., no of offsprings-1
             params = params_offsprings[i]
+            FPRS,TPRS = [0],[0]
             
-            ypred,h = feedForward(xs,params,onehot=False)
-            ypred = ypred.flatten()
-            ypred[ypred<decision] = 0
-            ypred[ypred>=decision] = 1
-            #print(np.shape(ypred))
-
-            #loss = np.mean(np.abs(ypred-ys))
-            TP = 0
-            AP = np.sum(ypred)
-            for i in range(len(ypred)):
-                if ypred[i] == 1 and ys[i]==1:
-                    TP += 1
-            if AP == 0:
-                TPR = 0
+            #for d in [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]:
+            #for d in [0.1,  0.3, 0.5,0.7, 0.9]:
+            for d in range(1):
+                ypred,h = feedForward(xs,params,onehot=False)
+                ypred = ypred.flatten()
+#                ypred[ypred<d] = 0
+#                ypred[ypred>=d] = 1
+    #            print(np.shape(ypred))
+    
+                #loss = np.mean(np.abs(ypred-ys))
+#                TP = 0
+#                TN = 0
+#                FP = 0
+#                FN = 0
+#                for i in range(len(ypred)):
+#    #                TP += ys[i]*ypred[i]
+#    #                FN += ys[i]*(1-ypred[i])
+#    #                FN += (1-ys[i])*ypred[i]
+#    #                FN += (1-ys[i])*(1-ypred[i])
+#                    
+#    #                
+#                    if ys[i]==1 and ypred[i] == 1:
+#                        
+#                        TP += 1
+#                    elif ys[i]==1 and ypred[i] == 0:
+#                        FN += 1
+#                    elif ys[i]==0 and ypred[i] == 1:
+#                        FP += 1
+#                    elif ys[i]==0 and ypred[i] == 0:
+#                        TN += 1
+#                    
+#                
+#                if TP + FN == 0:
+#                    TPR = 1
+#                else:
+#                    TPR = TP/(TP+FN)
+#                if FP + TN == 0:
+#                    FPR = 1
+#                else:
+#                    FPR = FP/(FP+TN)
+#                TPRS.append(TPR)
+#                FPRS.append(FPR)
+#            FPRS.append(1)
+#            TPRS.append(1)
+#            acc = 0
+#            #print(len(TPRS))
+#            #print(len(FPRS))
+#            for i in range(len(TPRS)-1):
+                #print(i,acc)
                 
-            else:
-                TPR = TP/AP
-            
-            loss = TPR
-            
+                #acc += (TPRS[i+1] + TPRS[i])*(FPRS[i+1]-FPRS[i])/2.0
+                acc = 1/(np.mean(np.abs(ys - ypred))+1)
             #loss = np.sum(np.abs(ys - ypred))/len(ys)
             #p = 1 - (e/len(teY))
             #print(loss)
-            losses.append(loss)
-        minLoss = np.max(losses)
-        minInd = losses.index(minLoss)
+            accuracies.append(acc)
+            #losses.append(loss)
+#        minLoss = np.min(losses)
+#        minInd = losses.index(minLoss)
+        
+        maxAcc = np.max(accuracies)
+        maxInd = accuracies.index(maxAcc)
         #survival params
-        params = params_offsprings[minInd]
-        ypred,h = feedForward(teX,params,onehot=False)
-        ypred = ypred.flatten()
-        ypred[ypred<decision] = 0
-        ypred[ypred>=decision] = 1
-        print(np.shape(teY),np.shape(ypred))
-        print(ypred)
-        print(np.abs(teY - ypred))
-        e = np.sum(np.abs(teY - ypred))
-        p = 1 - (e/len(teY))
+        FPRS,TPRS = [0],[0]
+        params = params_offsprings[maxInd]
+        #for d in [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]:
+        for d in [0.1,  0.3, 0.5,0.7, 0.9]:
+            ypred,h = feedForward(teX,params,onehot=False)
+            ypred = ypred.flatten()
+            ypred[ypred<d] = 0
+            ypred[ypred>=d] = 1
+#            print(np.shape(ypred))
+
+            #loss = np.mean(np.abs(ypred-ys))
+            TP = 0
+            TN = 0
+            FP = 0
+            FN = 0
+            for i in range(len(ypred)):
+#                TP += ys[i]*ypred[i]
+#                FN += ys[i]*(1-ypred[i])
+#                FN += (1-ys[i])*ypred[i]
+#                FN += (1-ys[i])*(1-ypred[i])
+                
+#                
+                if teY[i]==1 and ypred[i] == 1:
+                    
+                    TP += 1
+                elif teY[i]==1 and ypred[i] == 0:
+                    FN += 1
+                elif teY[i]==0 and ypred[i] == 1:
+                    FP += 1
+                elif teY[i]==0 and ypred[i] == 0:
+                    TN += 1
+                
+            
+            if TP + FN == 0:
+                TPR = 1
+            else:
+                TPR = TP/(TP+FN)
+            if FP + TN == 0:
+                FPR = 1
+            else:
+                FPR = FP/(FP+TN)
+            TPRS.append(TPR)
+            FPRS.append(FPR)
+        FPRS.append(1)
+        TPRS.append(1)
+        acc = 0
+        #print(len(TPRS))
+        #print(len(FPRS))
+        for i in range(len(TPRS)-1):
+            #print(i,acc)
+            
+            acc += (TPRS[i+1] + TPRS[i])*(FPRS[i+1]-FPRS[i])/2.0
         
-        TP = 0
-        AP = np.sum(ypred)
-        for i in range(len(ypred)):
-            if ypred[i] == 1 and teY[i]==1:
-                TP += 1
-        if AP == 0:
-            TPR=0
-        else:
-            TPR = TP/AP
+        #print('loss',minLoss)
         
-        #loss = TPR
-        
-        print('loss',minLoss)
-        print('dev', dev)
-        print('training TPR', minLoss)
-        print('test TPR',TPR)
+        print('training Acc', maxAcc)
+        print('test Acc',acc)
+#        print('test TPR', TPR)
+#        print('test FPR', FPR)
+        print('test datapoints', len(teX))
+#        print('test predicted positive', np.sum(ypred))
         #print(len(answer))
         print('\n#################\n')
               
     return params
-
-
-
-test_ratio = 0.3
-train_ratio = 1 - test_ratio
-n = len(rawData) #the number of questions
-
-gP,bP = goodPairs(rawData), badPairs(rawData,3*len(rawData))
-random.shuffle(gP)
-random.shuffle(bP)
-
-gpi,bpi = int(len(gP)*train_ratio), int(len(bP)*train_ratio)
-test_set_good, test_set_bad = gP[gpi:], bP[bpi:]
-train_set_good, train_set_bad = gP[:gpi], bP[:bpi]
-
-train_dataset = []
-test_dataset = []
-
-for i in range(len(train_set_good)):
-    train_dataset.append( prepareX(train_set_good[i],i) + [train_set_good[i][0], train_set_good[i][1], 1] )
-for j in range(len(train_set_bad)):
-    i = len(train_set_good)
-    train_dataset.append( prepareX(train_set_bad[j],i+j) + [train_set_bad[j][0], train_set_bad[j][1], 0] )  
-    
-for i in range(len(test_set_good)):
-    test_dataset.append( prepareX(test_set_good[i],i) + [test_set_good[i][0], test_set_good[i][1], 1] )
-for j in range(len(test_set_bad)):
-    i = len(test_set_good)
-    test_dataset.append( prepareX(test_set_bad[j],i+j) + [test_set_bad[j][0], test_set_bad[j][1], 0] )  
-
+#
+#
+#
+#test_ratio = 0.3
+#train_ratio = 1 - test_ratio
+#n = len(rawData) #the number of questions
+#
+#gP,bP = goodPairs(rawData), badPairs(rawData,3*len(rawData))
+#random.shuffle(gP)
+#random.shuffle(bP)
+#
+#gpi,bpi = int(len(gP)*train_ratio), int(len(bP)*train_ratio)
+#test_set_good, test_set_bad = gP[gpi:], bP[bpi:]
+#train_set_good, train_set_bad = gP[:gpi], bP[:bpi]
+#
+#train_dataset = []
+#test_dataset = []
+#
+#for i in range(len(train_set_good)):
+#    train_dataset.append( prepareX(train_set_good[i],i) + [train_set_good[i][0], train_set_good[i][1], 1] )
+#for j in range(len(train_set_bad)):
+#    i = len(train_set_good)
+#    train_dataset.append( prepareX(train_set_bad[j],i+j) + [train_set_bad[j][0], train_set_bad[j][1], 0] )  
+#    
+#for i in range(len(test_set_good)):
+#    test_dataset.append( prepareX(test_set_good[i],i) + [test_set_good[i][0], test_set_good[i][1], 1] )
+#for j in range(len(test_set_bad)):
+#    i = len(test_set_good)
+#    test_dataset.append( prepareX(test_set_bad[j],i+j) + [test_set_bad[j][0], test_set_bad[j][1], 0] )  
+#
 random.shuffle(train_dataset)
 random.shuffle(test_dataset)
 
-trX = np.array([row[:2] for row in train_dataset])
+trX = np.array([row[:10] for row in train_dataset])
 trY = np.array([row[-1] for row in train_dataset])
 
-teX = np.array([row[:2] for row in test_dataset])
+teX = np.array([row[:10] for row in test_dataset])
 teY = np.array([row[-1] for row in test_dataset])
 ########################################
 ##Plotting
-#
-## Create data
-#
-#x1 = [row[3] for row in train_dataset if row[-1]==1]
-##print(len(x))
-#y1 = [row[4] for row in train_dataset if row[-1]==1]
-#
-#x2 = [row[3] for row in train_dataset if row[-1]==0]
-##print(len(x))
-#y2 = [row[4] for row in train_dataset if row[-1]==0]
-#
-#
-#
-#c1 = 'blue'
-#c2 = 'red'
-## Plot
-#plt.scatter(x1, y1, c=c1, alpha=0.1)
-##plt.scatter(x2, y2, c=c2, alpha=0.1)
-#plt.title('Scatter plot pythonspot.com')
-#plt.xlabel('relevance')
-#plt.ylabel('relevance2')
-#
-#plt.show()
+
+# Create data
+
+x1 = [row[0] for row in train_dataset if row[-1]==1]
+#print(len(x))
+y1 = [row[1] for row in train_dataset if row[-1]==1]
+
+x2 = [row[0] for row in train_dataset if row[-1]==0]
+#print(len(x))
+y2 = [row[1] for row in train_dataset if row[-1]==0]
+
+
+
+c1 = 'blue'
+c2 = 'red'
+# Plot
+plt.scatter(x1, y1, c='green', alpha=0.01)
+plt.scatter(x2, y2, c='black', alpha=0.01)
+plt.title('Scatter plot')
+plt.xlabel('relevance')
+plt.ylabel('relevance2')
+
+plt.show()
 
 ###############################
 #Training
-'''
-适合冬天的运动有哪些？',
-  '冬季运动宜选择轻松平缓、活动量不大的项目，如滑雪、慢跑、徒步、自行车等户外运动，以及高温瑜伽、游泳、普拉提等室内项目。适当减少登山、球类运动，以防止运动量过大使免疫力降低，诱发感冒、肺炎等疾病。'''
-params = training(trX,trY,teX,teY)
-z = predict('怎么判断自己喜不喜欢一个男生？', '''如果你经常注意他，假如你看到他受到伤害的时候你会心疼，就说明你喜欢他了 ''', params)
-print(z)
+#'''
+
+#params = training(trX[:1000],trY[:1000],teX,teY)
+
+#######################
+#Testing
+'适合冬天的运动有哪些？',
+'''冬季运动宜选择轻松平缓、活动量不大的项目，如滑雪、慢跑、徒步、自行车等户外运动，以及高温瑜伽、游泳、普拉提等室内项目。适当减少登山、球类运动，以防止运动量过大使免疫力降低，诱发感冒、肺炎等疾病。'''
+
+
+q = '适合冬天的运动有哪些？'
+a = '''适合冬天的运动'''
+z = predict(q, a, params)
+print('actual isAnswer', 0)
+print('model predicted', z)
+qc = list(jieba.cut(q))
+ac = list(jieba.cut(a))
+z = score2(qc,ac)
+
+if z >0.015:
+    print('score2 predicted','1')
+else:
+    print('score2 predicted','0')
+print('score2',z)
+print('-----')
+
+q = '适合冬天的运动有哪些？'
+a = '''于这个值的实例划归为正类，小于这个值则划到负类中。如果减小阈值，减到0.5，固然能识别出的正类，也就是提高了识别出的正例占所有正例的比例，'''
+
+
+z = predict(q, a, params)
+print('actual isAnswer', 0)
+print('model predicted', z)
+qc = list(jieba.cut(q))
+ac = list(jieba.cut(a))
+z = score2(qc,ac)
+
+if z >0.015:
+    print('score2 predicted','1')
+else:
+    print('score2 predicted','0')
+print('score2',z)
+print('-----')
+
+q = '适合冬天的运动有哪些？'
+a = '''冬季运动宜选择轻松平缓、活动量不大的项目，'''
+print('actual isAnswer', 1)
+z = predict(q, a, params)
+print('model predicted', z)
+qc = list(jieba.cut(q))
+ac = list(jieba.cut(a))
+z = score2(qc,ac)
+
+if z >0.015:
+    print('score2 predicted','1')
+else:
+    print('score2 predicted','0')
+print('score2',z)
+print('-----')
+q = '中国历史上谁杀人最多'
+a = '''应该是白起，共计杀人一百余万，这还是白起的一张不完全统计的杀人账单。据梁启超考证，整个战国期间共战死两百万人，白起就占二分之一。铁血人屠当之无愧。'''
+print('actual isAnswer', 1)
+z = predict(q, a, params)
+print('model predicted', z)
+qc = list(jieba.cut(q))
+ac = list(jieba.cut(a))
+z = score2(qc,ac)
+
+if z >0.015:
+    print('score2 predicted','1')
+else:
+    print('score2 predicted','0')
+print('score2',z)
+print('-----')
+q = '适合冬天的运动有哪些？'
+a = '''冬季运动宜选择轻松平缓、活动量不大的项目，如滑雪、慢跑、徒步、自行车等户外运动，以及高温瑜伽、游泳、普拉提等室内项目。适当减少登山、球类运动，以防止运动量过大使免疫力降低，诱发感冒、肺炎等疾病。'''
+print('actual isAnswer', 1)
+z = predict(q, a, params)
+print('model predicted', z)
+qc = list(jieba.cut(q))
+ac = list(jieba.cut(a))
+z = score2(qc,ac)
+
+if z >0.015:
+    print('score2 predicted','1')
+else:
+    print('score2 predicted','0')
+print('score2',z)
