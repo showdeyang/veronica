@@ -283,7 +283,7 @@ qc = list(jieba.cut(query))
 fitness = []
 for sentence in sentences:
     ac = list(jieba.cut(sentence))
-    fitness.append(math.fabs(0.5-score(qc,ac)))
+    fitness.append(math.fabs(0.5-score2(qc,ac)))
 
 ind = fitness.index(min(fitness))
 answer = sentences[ind]
