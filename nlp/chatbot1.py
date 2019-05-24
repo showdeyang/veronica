@@ -4,24 +4,54 @@ import re
 import json
 import jieba
 import random
+import glob
 import numpy as np 
-
+import math
 with open('./baidu_zhidao.json','r') as f:
     data = json.loads(f.read())
 
 rawData = []
-for qa in data:
-    q = qa['q']
-    if 'ans' in qa.keys():
-        if len(qa['ans']) > 0:
-            ans = [item['a'].replace('展开全部','') for item in qa['ans']]
-    rawData.append([q,ans])
+#for qa in data:
+#    q = qa['q']
+#    if 'ans' in qa.keys():
+#        if len(qa['ans']) > 0:
+#            ans = [item['a'].replace('展开全部','') for item in qa['ans']]
+#    rawData.append([q,ans])
     
-    
-query = '污水处理中的COD是什么意思'
+rawConvFolder = '/data/clean_chat_corpus/'
+convFiles = glob.glob(rawConvFolder + '*.tsv')
+print(convFiles)
 
-questions = [row[0] for row in rawData]
-answers = [row[1] for row in rawData]
+data = []
+for convFile in convFiles:
+    print('extracting', convFile)
+    formattedData = []
+    with open(convFile,'r') as f:
+        rows = f.readlines()
+        for row in rows:
+            #if len(row.split('\t')) == 2:
+            formattedData.append(row.split('\t'))
+            #print(row)
+        
+        data += formattedData
+#    
+
+
+#formattedData = []
+#with open('/data/clean_chat_corpus/qingyun.tsv','r') as f:
+#    rows = f.readlines()
+#    for row in rows:
+#        #if len(row.split('\t')) == 2:
+#        formattedData.append(row.split('\t'))
+#        #print(row)
+#    
+#    data += formattedData    
+#
+rawData += data
+
+
+questions = [row[0] for row in data]
+answers = [row[1] for row in data]
 
 def relevance(qc,ac):
     c = 0 
@@ -157,7 +187,7 @@ def prepareAnswers(query,questions=questions,answers=answers,mode=0,threshold=0.
             s = cosineDistance(query,q)
             if s >= threshold:
                 result = answers[questions.index(q)]
-                results += result
+                results.append(result)
     if mode ==4:
         for ans in answers:
             for a in ans:
@@ -169,17 +199,38 @@ def prepareAnswers(query,questions=questions,answers=answers,mode=0,threshold=0.
 
     
     
-def reply(query,questions=questions,answers=answers, mode=3, threshold=0.8):
-    results = prepareAnswers(query,questions=questions,answers=answers,mode=mode,threshold=0.5)
+def reply(query,questions=questions,answers=answers, mode=3, threshold=0.9, attempts=100000):
+    results = []
+    for i in range(attempts):
+        q = random.choice(questions)
+        s = cosineDistance(query,q)
+        #s = (qInA(query,q)*len(query) + qInA(q,query)*len(q))/2.0
+        if s >= threshold:
+            ind = questions.index(q)
+            result = answers[ind]
+            results.append(result)
+            if len(results) > 3:
+                break
+    
+    #results = prepareAnswers(query,questions=questions,answers=answers,mode=mode,threshold=0.5)
     if len(results) == 0:
         return '对不起，我现有的知识还无法很好的回答此问题．'
     else:
-        #fitness =[ cosineDistance(res,q) for res in results]
-        #maxF = np.max(fitness)
-        #ans = results[fitness.index(maxF)]
-        ans = random.choice(results)
+        fitness =[ cosineDistance(res,q) for res in results]
+        maxF = np.max(fitness)
+        ans = results[fitness.index(maxF)]
+        #ans = random.choice(results)
+        #print(results)
         #print(ans)
         return ans
-        
-        
-    
+
+#def determinePoissonMean(size=1000,questions=questions):
+print('questions',len(questions))
+print('conversation starts')
+query = input('>>>')
+while query != 'bye veronica':
+    if query.strip() == '':
+        query = input('>>>')
+    else:
+        print(reply(query).strip())   
+    query = input(">>>")   
