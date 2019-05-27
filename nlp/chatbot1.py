@@ -9,7 +9,7 @@ import numpy as np
 import math
 with open('./baidu_zhidao.json','r') as f:
     data = json.loads(f.read())
-
+    
 rawData = []
 for qa in data:
     q = qa['q']
@@ -17,7 +17,9 @@ for qa in data:
         if len(qa['ans']) > 0:
             ans = [item['a'].replace('展开全部','') for item in qa['ans']]
             for a in ans:
-                rawData.append([q,a])
+                if len(a) > 0:
+                    rawData.append([q,a])
+
 
 print('extracting data from baidu_zhidao scraper')  
 rawConvFolder = '/data/clean_chat_corpus/'
@@ -201,22 +203,26 @@ def prepareAnswers(query,questions=questions,answers=answers,mode=0,threshold=0.
 
     
     
-def reply(query,questions=questions,answers=answers, mode=3, threshold=0.9, attempts=100000):
+def reply(query,questions=questions,answers=answers, mode=3, threshold=0.9, attempts=1000):
     results = []
+    qs = random.choices(questions,k=attempts)
     for i in range(attempts):
-        q = random.choice(questions)
+        q = qs[i]
         s = cosineDistance(query,q)
         #s = (qInA(query,q)*len(query) + qInA(q,query)*len(q))/2.0
-        if s >= threshold:
+        if s >= 0.5:
             ind = questions.index(q)
             result = answers[ind]
             results.append(result)
-            if len(results) > 3:
+            if len(results) > 100:
                 break
     
     #results = prepareAnswers(query,questions=questions,answers=answers,mode=mode,threshold=0.5)
     if len(results) == 0:
         return '对不起，我现有的知识还无法很好的回答此问题．'
+    
+    
+    
     else:
         fitness =[ cosineDistance(res,q) for res in results]
         maxF = np.max(fitness)
