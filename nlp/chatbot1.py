@@ -11,13 +11,15 @@ with open('./baidu_zhidao.json','r') as f:
     data = json.loads(f.read())
 
 rawData = []
-#for qa in data:
-#    q = qa['q']
-#    if 'ans' in qa.keys():
-#        if len(qa['ans']) > 0:
-#            ans = [item['a'].replace('展开全部','') for item in qa['ans']]
-#    rawData.append([q,ans])
-    
+for qa in data:
+    q = qa['q']
+    if 'ans' in qa.keys():
+        if len(qa['ans']) > 0:
+            ans = [item['a'].replace('展开全部','') for item in qa['ans']]
+            for a in ans:
+                rawData.append([q,a])
+
+print('extracting data from baidu_zhidao scraper')  
 rawConvFolder = '/data/clean_chat_corpus/'
 convFiles = glob.glob(rawConvFolder + '*.tsv')
 print(convFiles)
@@ -50,8 +52,8 @@ for convFile in convFiles:
 rawData += data
 
 
-questions = [row[0] for row in data]
-answers = [row[1] for row in data]
+questions = [row[0] for row in rawData]
+answers = [row[1] for row in rawData]
 
 def relevance(qc,ac):
     c = 0 
