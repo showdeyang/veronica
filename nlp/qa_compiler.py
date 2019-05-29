@@ -7,6 +7,7 @@ import os
 import multiprocessing
 import random
 import math
+import time
 
 with open('./baidu_zhidao.json','r') as f:
     data = json.loads(f.read())
@@ -207,10 +208,18 @@ def removeDup2g(p=6):
     files = glob.glob(r'./twograms/*.txt')
     
     r = pool.map(removeFrequent2g, files)
-    
-#analyze2gqs(questions) 
-#removeDup2g()
 
+t1 = time.time()
+analyze2gqs(questions) 
+removeDup2g()
+t2 =time.time()
+
+timetaken = t2-t1
+
+with open('./timetaken.txt','w') as f:
+    f.write(timetaken)
+    
+    
 question = input('>>>')
 while question != 'bye veronica':
     if question.strip() != '':
