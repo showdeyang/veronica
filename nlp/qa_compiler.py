@@ -6,6 +6,7 @@ import glob
 import os 
 import multiprocessing
 import random
+import math
 
 with open('./baidu_zhidao.json','r') as f:
     data = json.loads(f.read())
@@ -26,6 +27,10 @@ convFiles = glob.glob(rawConvFolder + '*.tsv')
 print(convFiles)
 
 data = []
+removeList = ['/data/clean_chat_corpus/douban_single_turn.tsv','/data/clean_chat_corpus/subtitle.tsv']
+if len(removeList) > 0:
+    for item in removeList:
+        convFiles.remove(item)
 for convFile in convFiles:
     print('extracting', convFile)
     formattedData = []
@@ -78,8 +83,9 @@ print(len(questions))
 
   
 
-def most_common (lst):
-    return max(((item, lst.count(item)) for item in set(lst)), key=lambda a: a[1])[0]
+def most_common(lst):
+    x = max(((item, lst.count(item)) for item in set(lst)), key=lambda a: a[1])[0]
+    return x
         
 #def reply(question,model=model):
 #    answer = ''
@@ -147,7 +153,8 @@ def analyze2gqs(questions):
 
 
 
-def similarQ(query):
+def similarQ(query,p=10,multi=False):
+    pool = multiprocessing.Pool(p)
     q = split2g(query)
     results = []
     for c in q:
@@ -156,19 +163,42 @@ def similarQ(query):
                 results += [d.strip() for d in f.readlines()]
         except FileNotFoundError:
             continue
-    try:
-        result = most_common(results) 
-    except ValueError:
-        result = None
-    print(result)
+    if multi:
+        try:
+            random.shuffle(results)
+            size = 1000
+            partitions = range(math.ceil(len(results)/size))
+            subresults = []
+            for partition in partitions:
+                subresults.append(results[partition*size:(partition+1)*size])
+            modes = pool.map(most_common, subresults)
+            result = most_common(modes)
+        except ValueError:
+            result = None
+    else:
+        try:
+            result = most_common(results)
+        except ValueError:
+            result = None
+    #print(result)
     return result
 
 def replyFast(query):
-    result = similarQ(query)
+    result = similarQ(query, multi=True)
     if result:
         indexes = search_binary_with_comprehension(questions,result)
         results = [answers[ind] for ind in indexes]
-        return random.choice(results)
+        
+        try:
+            return random.choice(results)
+        except IndexError:
+            result = similarQ(query,multi=False)
+            if result:
+                indexes = search_binary_with_comprehension(questions,result)
+                results = [answers[ind] for ind in indexes]
+                return random.choice(results)
+            else: 
+                return None
     else:
         return None
 
@@ -177,9 +207,9 @@ def removeDup2g(p=6):
     files = glob.glob(r'./twograms/*.txt')
     
     r = pool.map(removeFrequent2g, files)
-
+    
 #analyze2gqs(questions) 
-removeDup2g()
+#removeDup2g()
 
 question = input('>>>')
 while question != 'bye veronica':
