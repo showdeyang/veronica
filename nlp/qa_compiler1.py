@@ -172,14 +172,8 @@ def replyFast(query):
     else:
         return None
 
-def removeDup2g(p=6):
-    pool = multiprocessing.Pool(p)
-    files = glob.glob(r'./twograms/*.txt')
-    
-    r = pool.map(removeFrequent2g, files)
-
 #analyze2gqs(questions) 
-removeDup2g()
+
 
 question = input('>>>')
 while question != 'bye veronica':
