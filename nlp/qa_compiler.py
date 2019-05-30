@@ -136,8 +136,8 @@ def search_binary_with_comprehension (xs, target):
    return [ count  for count, val in enumerate(xs) if val == target]
 
 
-def analyze2gqs(questions):
-    pool = multiprocessing.Pool()
+def analyze2gqs(questions,p=6):
+    pool = multiprocessing.Pool(p)
     
     print(len(questions))
     
@@ -154,7 +154,7 @@ def analyze2gqs(questions):
 
 
 
-def similarQ(query,p=10,multi=False):
+def similarQ(query,p=6,multi=False):
     pool = multiprocessing.Pool(p)
     q = split2g(query)
     results = []
@@ -217,7 +217,7 @@ t2 =time.time()
 timetaken = t2-t1
 
 with open('./timetaken.txt','w') as f:
-    f.write(timetaken)
+    f.write(str(timetaken))
     
     
 question = input('>>>')
