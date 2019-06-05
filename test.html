@@ -1,0 +1,22 @@
+<script>
+         $(document).ready(function(){
+    	 
+    $('body').on('click','#disapprove', function() {
+    console.log('clicked');
+        
+          disapprove();
+    });  
+     
+     
+    $('#approve').unbind().on('click', function(e) {
+    e.preventDefault() ;
+    e.stopPropagation();
+    console.log('clicked');
+    
+     // approve();
+     //location.reload();
+          
+    });    
+   
+});
+</script>
